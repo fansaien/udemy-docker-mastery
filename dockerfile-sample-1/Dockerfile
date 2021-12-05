@@ -3,41 +3,34 @@
 # NOTE: This file is slightly different than the video, because nginx versions have been updated 
 #       to match the latest standards from docker hub... but it's doing the same thing as the video
 #       describes
-FROM debian:stretch-slim
+FROM arm64v8/debian:buster
 # all images must have a FROM
 # usually from a minimal Linux distribution like debian or (even better) alpine
 # if you truly want to start with an empty container, use FROM scratch
 
-ENV NGINX_VERSION 1.13.6-1~stretch
-ENV NJS_VERSION   1.13.6.0.1.14-1~stretch
+# ENV NGINX_VERSION 1.13.6-1~stretch
+# ENV NJS_VERSION   1.13.6.0.1.14-1~stretch
+
+#http://nginx.org/en/linux_packages.html#Debian
+
+ENV NGINX_VERSION 1.21.4-1~buster
+ENV NJS_VERSION   1.18.0-6.1
+
 # optional environment variable that's used in later lines and set as envvar when container is running
 
 RUN apt-get update \
 	&& apt-get install --no-install-recommends --no-install-suggests -y gnupg1 \
 	&& \
 	NGINX_GPGKEY=573BFD6B3D8FBC641079A6ABABF5BD827BD9BF62; \
-	found=''; \
-	for server in \
-		ha.pool.sks-keyservers.net \
-		hkp://keyserver.ubuntu.com:80 \
-		hkp://p80.pool.sks-keyservers.net:80 \
-		pgp.mit.edu \
-	; do \
-		echo "Fetching GPG key $NGINX_GPGKEY from $server"; \
-		apt-key adv --keyserver "$server" --keyserver-options timeout=10 --recv-keys "$NGINX_GPGKEY" && found=yes && break; \
-	done; \
-	test -z "$found" && echo >&2 "error: failed to fetch GPG key $NGINX_GPGKEY" && exit 1; \
-	apt-get remove --purge -y gnupg1 && apt-get -y --purge autoremove && rm -rf /var/lib/apt/lists/* \
-	&& echo "deb http://nginx.org/packages/mainline/debian/ stretch nginx" >> /etc/apt/sources.list \
+	apt-get --no-install-recommends --no-install-suggests -y install curl gnupg2 ca-certificates lsb-release debian-archive-keyring \
+	&& curl https://nginx.org/keys/nginx_signing.key | gpg --dearmor \
+	| tee /usr/share/keyrings/nginx-archive-keyring.gpg >/dev/null \
+	# && gpg --dry-run --quiet --import --import-options import-show /usr/share/keyrings/nginx-archive-keyring.gpg \
+	&& echo "deb [signed-by=/usr/share/keyrings/nginx-archive-keyring.gpg] \ 
+	http://nginx.org/packages/debian `lsb_release -cs` nginx" \
+	| tee /etc/apt/sources.list.d/nginx.list \
 	&& apt-get update \
-	&& apt-get install --no-install-recommends --no-install-suggests -y \
-						nginx=${NGINX_VERSION} \
-						nginx-module-xslt=${NGINX_VERSION} \
-						nginx-module-geoip=${NGINX_VERSION} \
-						nginx-module-image-filter=${NGINX_VERSION} \
-						nginx-module-njs=${NJS_VERSION} \
-						gettext-base \
-	&& rm -rf /var/lib/apt/lists/*
+	&& apt-get --no-install-recommends --no-install-suggests -y install nginx
 # optional commands to run at shell inside container at build time
 # this one adds package repo for nginx from nginx.org and installs it
 
